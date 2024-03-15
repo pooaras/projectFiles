@@ -58,7 +58,7 @@ def find_related_files(directory, file1, window_size):
 
 
 def callSimilar(file_path):
-    directory = "/home/mukesh/code"
+    directory = "D:\project\projectFiles"
     file1 = file_path
     window_size = 10  # Adjust window size as needed
 

@@ -3,4 +3,4 @@ Days 1-3: Arrays and Strings
 
     Day 1: Array basics - Search, Sort, and Rotate
     Day 2: Array manipulation and Prefix Sum
-    Day 3: String 
+    Day 3: Stri

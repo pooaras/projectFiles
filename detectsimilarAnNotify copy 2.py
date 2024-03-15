@@ -93,54 +93,30 @@ def popup_window(output, file_path):
     root.title("File Similarity Checker")
     root.geometry("900x700")
 
+    similar_files_text = tk.Text(root, height=10, width=60)
+    similar_files_text.pack(pady=5)
     file_listbox = tk.Listbox(root, height=10, width=60)
     file_listbox.pack(pady=5)
     for filename, similarity in output:
         file_listbox.insert(tk.END, f"{filename}: {similarity:.2f}%")
-    def open_selected_file(event):
-        index = file_listbox.curselection()
-        if index:
-            selected_file = file_listbox.get(index)
-            selected_filename = selected_file.split(":")[0].strip()
-            selected_file_path = os.path.join(os.path.dirname(file_path), selected_filename)
-            os.startfile(selected_file_path)
-
-    file_listbox.bind("<Double-Button-1>", open_selected_file)
     if os.path.exists(file_path):
         
         if any(similarity == 100 for _, similarity in output):
-            match_label = tk.Label(root, text="File already exists with 100% match. Do you want to delete existing files except the current file?", font=("Arial", 10, "bold"), fg="red")
+            match_label = tk.Label(root, text="File already exists with 100% match. Do you want to delete the current file?", font=("Arial", 10, "bold"), fg="red")
             match_label.pack(pady=5)
             
-            delete_button = tk.Button(root, text="Delete All Matching Files", command=lambda: delete_files(output,file_path, root, file_listbox))
+            delete_button = tk.Button(root, text="Delete All Matching Files", command=lambda: delete_files(output,file_path, root))
             delete_button.pack(pady=5)
+
     root.mainloop()
-def open_file(file_path):
-    os.startfile(file_path)
-def delete_files(related_files,file_path, root, file_listbox):
+
+def delete_files(related_files,file_path, root):
     directory = os.path.dirname(file_path)
-    files_deleted = False
     for filename, similarity in related_files:
         if similarity == 100 and os.path.join(directory, filename) != file_path:
             os.remove(os.path.join(directory, filename))
-            files_deleted = True
-    
-    if files_deleted:
-        messagebox.showinfo("Files Deleted", "All matching files except the current file have been deleted successfully.")
-        
-        # Clear existing items in the listbox
-        file_listbox.delete(0, tk.END)
-        
-        # Get updated similarity information
-        updated_related_files = find_related_files(directory, file_path, window_size)
-        
-        # Insert updated similarity information into the listbox
-        for filename, similarity in updated_related_files:
-            file_listbox.insert(tk.END, f"{filename}: {similarity:.2f}%")
-    else:
-        messagebox.showinfo("No Files Deleted", "No matching files found to delete.")
-
-    root.mainloop()
+    messagebox.showinfo("Files Deleted", "All matching files except the current file have been deleted successfully.")
+    root.destroy()
 
 
 
@@ -168,4 +144,5 @@ if __name__ == "__main__":
     if not os.path.isdir(directory):    
         print(f"Error: {directory} is not a directory.")
         sys.exit(1)
+
     watch_directory(directory, window_size)
