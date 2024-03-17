@@ -96,7 +96,9 @@ def popup_window(output, file_path):
     file_listbox = tk.Listbox(root, height=10, width=60)
     file_listbox.pack(pady=5)
     for filename, similarity in output:
-        file_listbox.insert(tk.END, f"{filename}: {similarity:.2f}%")
+        cur_file=os.path.basename(file_path)
+        if(filename!=cur_file):
+            file_listbox.insert(tk.END, f"{filename}: {similarity:.2f}%")
     def open_selected_file(event):
         index = file_listbox.curselection()
         if index:
@@ -104,7 +106,8 @@ def popup_window(output, file_path):
             selected_filename = selected_file.split(":")[0].strip()
             selected_file_path = os.path.join(os.path.dirname(file_path), selected_filename)
             os.startfile(selected_file_path)
-
+    label=tk.Label(root,text=f"{file_path}")
+    label.pack(pady=5)
     file_listbox.bind("<Double-Button-1>", open_selected_file)
     if os.path.exists(file_path):
         
