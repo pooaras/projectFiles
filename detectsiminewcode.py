@@ -1,12 +1,42 @@
 import os
 import sys
 import time
-os.environ['PLYER_BACKEND'] = 'win10toast'
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
-from plyer import notification
+from PIL import Image, ImageTk
 import tkinter as tk
 from tkinter import messagebox
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+
+class CheckboxListbox(tk.Frame):
+    def __init__(self, master, **kwargs):
+        super().__init__(master, **kwargs)
+        self.checked_items = set()
+        self.listbox = tk.Listbox(self, selectmode=tk.MULTIPLE)
+        self.scrollbar = tk.Scrollbar(self, orient=tk.VERTICAL, command=self.listbox.yview)
+        self.listbox.config(yscrollcommand=self.scrollbar.set)
+        self.listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.checked_image = ImageTk.PhotoImage(Image.open("checked.png").resize((16, 16)))
+        self.unchecked_image = ImageTk.PhotoImage(Image.open("unchecked.png").resize((16, 16)))
+
+        self.listbox.bind("<Button-1>", self.toggle_checkbox)
+
+    def insert_checkbox(self, index, text):
+        self.listbox.insert(index, text)
+        self.listbox.itemconfig(index, image=self.unchecked_image)
+
+    def toggle_checkbox(self, event):
+        index = self.listbox.nearest(event.y)
+        if index in self.checked_items:
+            self.listbox.itemconfig(index, image=self.unchecked_image)
+            self.checked_items.remove(index)
+        else:
+            self.listbox.itemconfig(index, image=self.checked_image)
+            self.checked_items.add(index)
+
+    def get_checked_items(self):
+        return [self.listbox.get(idx) for idx in self.checked_items]
 
 def rolling_hash(text, window_size):
     """
@@ -77,7 +107,7 @@ class NewFileHandler(FileSystemEventHandler):
         if event.is_directory:
             return
         file_path = event.src_path
-        output=callSimilar(file_path, self.directory, self.window_size)
+        output = callSimilar(file_path, self.directory, self.window_size)
         print(f"New file created: {file_path}")
         popup_window(output, file_path)
         try:
@@ -88,74 +118,53 @@ class NewFileHandler(FileSystemEventHandler):
             )
         except Exception as e:
             print("Error displaying notification:", e)
+
+
 def popup_window(output, file_path):
     root = tk.Tk()
     root.title("File Similarity Checker")
     root.geometry("900x700")
 
-    file_listbox = tk.Listbox(root, height=10, width=60)
-    file_listbox.pack(pady=5)
+    main_frame = tk.Frame(root)
+    main_frame.pack(pady=5)
+
+    checkbox_listboxes = []
+
     for filename, similarity in output:
-        cur_file=os.path.basename(file_path)
-        if(filename!=cur_file):
-            file_listbox.insert(tk.END, f"{filename}: {similarity:.2f}%")
-    def open_selected_file(event):
-        index = file_listbox.curselection()
-        if index:
-            selected_file = file_listbox.get(index)
-            selected_filename = selected_file.split(":")[0].strip()
-            selected_file_path = os.path.join(os.path.dirname(file_path), selected_filename)
-            os.startfile(selected_file_path)
-    label=tk.Label(root,text=f"{file_path}")
+        cur_file = os.path.basename(file_path)
+        if filename != cur_file:
+            frame = tk.Frame(main_frame)
+            frame.pack(anchor=tk.W)
+
+            checkbox_listbox = CheckboxListbox(frame)
+            checkbox_listbox.pack(side=tk.LEFT)
+            checkbox_listbox.insert_checkbox(tk.END, f"{filename}: {similarity:.2f}%")
+
+            checkbox_listboxes.append(checkbox_listbox)
+
+    label = tk.Label(root, text=f"{file_path}")
     label.pack(pady=5)
-    file_listbox.bind("<Double-Button-1>", open_selected_file)
-    delete_button = tk.Button(root, text="Delete Selected File", command=delete_selected_file)
+
+    def delete_selected_files():
+        for checkbox_listbox in checkbox_listboxes:
+            checked_items = checkbox_listbox.get_checked_items()
+            if checked_items:
+                selected_file = checked_items[0]
+                selected_filename = selected_file.split(":")[0].strip()
+                selected_file_path = os.path.join(os.path.dirname(file_path), selected_filename)
+                os.remove(selected_file_path)
+        messagebox.showinfo("Files Deleted", "Selected files have been deleted successfully.")
+
+        root.destroy()
+
+    delete_button = tk.Button(root, text="Delete Selected Files", command=delete_selected_files)
     delete_button.pack(pady=5)
-    def delete_selected_file():
-        index = file_listbox.curselection()
-        if index:
-            selected_file = file_listbox.get(index)
-            selected_filename = selected_file.split(":")[0].strip()
-            selected_file_path = os.path.join(os.path.dirname(file_path), selected_filename)
-            os.remove(selected_file_path)
-            file_listbox.delete(index)
-    if os.path.exists(file_path):
-        
-        if any(similarity == 100 for _, similarity in output):
-            match_label = tk.Label(root, text="File already exists with 100% match. Do you want to delete existing files except the current file?", font=("Arial", 10, "bold"), fg="red")
-            match_label.pack(pady=5)
-            
-            delete_button = tk.Button(root, text="Delete All Matching Files", command=lambda: delete_files(output,file_path, root, file_listbox))
-            delete_button.pack(pady=5)
+
     root.mainloop()
+
+
 def open_file(file_path):
     os.startfile(file_path)
-def delete_files(related_files,file_path, root, file_listbox):
-    directory = os.path.dirname(file_path)
-    files_deleted = False
-    for filename, similarity in related_files:
-        if similarity == 100 and os.path.join(directory, filename) != file_path:
-            os.remove(os.path.join(directory, filename))
-            files_deleted = True
-    
-    if files_deleted:
-        messagebox.showinfo("Files Deleted", "All matching files except the current file have been deleted successfully.")
-        
-        # Clear existing items in the listbox
-        file_listbox.delete(0, tk.END)
-        
-        # Get updated similarity information
-        updated_related_files = find_related_files(directory, file_path, window_size)
-        
-        # Insert updated similarity information into the listbox
-        for filename, similarity in updated_related_files:
-            file_listbox.insert(tk.END, f"{filename}: {similarity:.2f}%")
-    else:
-        messagebox.showinfo("No Files Deleted", "No matching files found to delete.")
-
-    root.mainloop()
-
-
 
 def watch_directory(directory, window_size):
     event_handler = NewFileHandler(directory, window_size)
@@ -174,11 +183,11 @@ if __name__ == "__main__":
     if len(sys.argv) != 3:
         print("Usage: python script.py /path/to/directory window_size")
         sys.exit(1)
-    
+
     directory = sys.argv[1]
     window_size = int(sys.argv[2])
 
-    if not os.path.isdir(directory):    
+    if not os.path.isdir(directory):
         print(f"Error: {directory} is not a directory.")
         sys.exit(1)
     watch_directory(directory, window_size)
