@@ -4,7 +4,6 @@ import time
 os.environ['PLYER_BACKEND'] = 'win10toast'
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-from plyer import notification
 import tkinter as tk
 from tkinter import messagebox
 
@@ -80,14 +79,6 @@ class NewFileHandler(FileSystemEventHandler):
         output=callSimilar(file_path, self.directory, self.window_size)
         print(f"New file created: {file_path}")
         popup_window(output, file_path)
-        try:
-            notification.notify(
-                title="New File Created",
-                message=f"A new file has been created: {os.path.basename(file_path)}",
-                app_name="File Watcher",
-            )
-        except Exception as e:
-            print("Error displaying notification:", e)
 def popup_window(output, file_path):
     root = tk.Tk()
     root.title("File Similarity Checker")
@@ -109,6 +100,7 @@ def popup_window(output, file_path):
     label=tk.Label(root,text=f"{file_path}")
     label.pack(pady=5)
     file_listbox.bind("<Double-Button-1>", open_selected_file)
+    
     if os.path.exists(file_path):
         
         if any(similarity == 100 for _, similarity in output):
