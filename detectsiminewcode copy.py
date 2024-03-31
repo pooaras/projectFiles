@@ -11,9 +11,8 @@ class CheckboxTreeview(tk.Frame):
     def __init__(self, master, **kwargs):
         super().__init__(master, **kwargs)
         self.checked_items = set()
-        self.treeview = ttk.Treeview(self, selectmode="extended", columns=("Checkbox", "Filename", "Similarity"))
+        self.treeview = ttk.Treeview(self, selectmode="extended", columns=("Filename", "Similarity"))
         self.treeview.heading("#0", text="Check")
-        self.treeview.heading("Checkbox", text="Checkbox")
         self.treeview.heading("Filename", text="Filename")
         self.treeview.heading("Similarity", text="Similarity")
         self.treeview.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -30,7 +29,7 @@ class CheckboxTreeview(tk.Frame):
         self.treeview.bind("<Button-1>", self.toggle_checkbox)
 
     def insert_checkbox(self, index, filename, similarity):
-        item_id = self.treeview.insert("", index, text="", values=(self.unchecked_image, filename, similarity))
+        item_id = self.treeview.insert("", index, text="", values=(filename, similarity))
         self.checked_items.discard(item_id)
 
     def toggle_checkbox(self, event):
@@ -49,10 +48,11 @@ class CheckboxTreeview(tk.Frame):
             try:
                 item_values = self.treeview.item(item_id)
                 if item_values is not None:  # Check if the item exists in the treeview
-                    checked_items.append(item_values["values"][1])
+                    checked_items.append(item_values["values"][0])
             except tk.TclError:  # Catch the TclError if the item is not found
                 pass
         return checked_items
+
 
 def rolling_hash(text, window_size):
     """
@@ -77,7 +77,7 @@ def find_similarity(file1, file2, window_size):
     """
     Find similarity between two text files using rolling hashing.
     """
-    with open(file1, 'r') as f1, open(file2, 'r') as f2:
+    with open(file1, 'r',encoding='utf-8') as f1, open(file2, 'r',encoding='utf-8') as f2:
         text1 = f1.read()
         text2 = f2.read()
 
@@ -124,6 +124,22 @@ class NewFileHandler(FileSystemEventHandler):
         popup_window(output, file_path)
 
 def popup_window(files, file_path):
+    top = tk.Toplevel()
+    top.title("File Similarity Checker")
+    top.geometry("900x700")
+    top.attributes('-topmost', True)  # Ensure the window stays on top
+
+    main_frame = tk.Frame(top)
+    main_frame.pack(pady=5)
+    checkbox_treeview = CheckboxTreeview(main_frame)
+    checkbox_treeview.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+    for filename, similarity in files:
+        cur_file = os.path.basename(file_path)
+        if filename != cur_file:
+            checkbox_treeview.insert_checkbox(tk.END, filename, f"{similarity:.2f}%")
+
+    label = tk.Label(top, text=f"{file_path}")
+    label.pack(pady=5)
 
     def delete_selected_files():
         nonlocal files
@@ -140,43 +156,23 @@ def popup_window(files, file_path):
             confirmation_message = f"Are you sure you want to delete the following files?\n\n"
             confirmation_message += "\n".join(files_to_delete)
             # Display a confirmation messagebox
-            if messagebox.askyesno("Confirm Deletion", confirmation_message):
+            if messagebox.askyesno("Confirm Deletion", confirmation_message, parent=top):
                 # Delete files and display a success message
                 for filename in files_to_delete:
                     file_path = os.path.join(directory, filename)
                     try:
                         os.remove(file_path)
                     except OSError as e:
-                        messagebox.showerror("Error", f"Failed to delete {filename}: {e}")
-                messagebox.showinfo("Files Deleted", "Selected files have been deleted successfully.")
+                        messagebox.showerror("Error", f"Failed to delete {filename}: {e}", parent=top)
+                messagebox.showinfo("Files Deleted", "Selected files have been deleted successfully.", parent=top)
         checkbox_treeview.treeview.delete(*checkbox_treeview.treeview.get_children())
         for filename, similarity in files:
             checkbox_treeview.insert_checkbox(tk.END, filename, f"{similarity:.2f}%")
 
-
-    root = tk.Tk()
-    root.title("File Similarity Checker")
-    root.geometry("900x700")
-
-    main_frame = tk.Frame(root)
-    main_frame.pack(pady=5)
-
-    checkbox_treeview = CheckboxTreeview(main_frame)
-    checkbox_treeview.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-    for filename, similarity in files:
-        cur_file = os.path.basename(file_path)
-        if filename != cur_file:
-            checkbox_treeview.insert_checkbox(tk.END, filename, f"{similarity:.2f}%")
-
-    label = tk.Label(root, text=f"{file_path}")
-    label.pack(pady=5)
-
-    delete_button = tk.Button(root, text="Delete Selected Files", command=delete_selected_files)
+    delete_button = tk.Button(top, text="Delete Selected Files", command=delete_selected_files)
     delete_button.pack(pady=5)
 
-    root.mainloop()
-
+    top.mainloop()
 
 # Usage:
 # popup_window([("file1.txt", 90), ("file2.txt", 80)], "path/to/current/file.txt")

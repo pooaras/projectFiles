@@ -1,0 +1,102 @@
+def popup_window(files, file_path, autocheck=True):
+    def delete_selected_files():
+        nonlocal files
+        checked_items = checkbox_treeview.get_checked_items()
+        files_to_delete = []  # Accumulate files to delete
+        for item in checked_items:
+            selected_filename = item
+            selected_file = next((file for file in files if file[0] == selected_filename), None)
+            if selected_file:
+                files.remove(selected_file)
+                files_to_delete.append(selected_filename)  # Accumulate the filename
+        if files_to_delete:
+            # Construct a confirmation message listing all files to be deleted
+            confirmation_message = f"Are you sure you want to delete the following files?\n\n"
+            confirmation_message += "\n".join(files_to_delete)
+            # Display a confirmation messagebox
+            if messagebox.askyesno("Confirm Deletion", confirmation_message):
+                # Delete files and display a success message
+                for filename in files_to_delete:
+                    filepath = os.path.join(directory, filename)
+                    try:
+                        os.remove(filepath)
+                    except OSError as e:
+                        messagebox.showerror("Error", f"Failed to delete {filename}: {e}")
+                messagebox.showinfo("Files Deleted", "Selected files have been deleted successfully.")
+                refresh_treeview()
+        else:
+            messagebox.showinfo("No Files Selected", "No files selected for deletion.")
+
+        # If auto-checked files were not manually selected but are still in the autochecked_files list, consider them for deletion
+    def auto_delete_selected_files():
+        nonlocal files
+        checked_items = checkbox_treeview.get_checked_items()
+        files_to_delete = []  # Accumulate files to delete
+        for item in checked_items:
+            selected_filename = item
+            selected_file = next((file for file in files if file[0] == selected_filename), None)
+            if selected_file:
+                files.remove(selected_file)
+                files_to_delete.append(selected_filename)
+        auto_checked_for_deletion = [filename for filename in autochecked_files if filename not in files_to_delete]
+        if auto_checked_for_deletion:
+            confirmation_message = f"The following auto-checked files have 100% similarity with {os.path.basename(file_path)}. Do you want to delete them?\n\n"
+            confirmation_message += "\n".join(auto_checked_for_deletion)
+            if messagebox.askyesno("Confirm Deletion", confirmation_message):
+                # Delete auto-checked files and display a success message
+                for filename in auto_checked_for_deletion:
+                    filepath = os.path.join(directory, filename)
+                    try:
+                        os.remove(filepath)
+                    except OSError as e:
+                        messagebox.showerror("Error", f"Failed to delete {filename}: {e}")
+                messagebox.showinfo("Files Deleted", "Auto-checked files with 100% similarity have been deleted successfully.")
+                # Remove auto-checked files from the list before refreshing the treeview
+                files = [file for file in files if file[0] not in auto_checked_for_deletion]
+                refresh_treeview()
+
+    def refresh_treeview():
+        checkbox_treeview.treeview.delete(*checkbox_treeview.treeview.get_children())
+        for filename, similarity in files:
+            checkbox_treeview.insert_checkbox(tk.END, filename, f"{similarity:.2f}%")
+
+    root = tk.Tk()
+    root.title("File Similarity Checker")
+    root.geometry("900x700")
+    root.attributes('-topmost', True)
+    main_frame = tk.Frame(root)
+    main_frame.pack(pady=5)
+
+    checkbox_treeview = CheckboxTreeview(main_frame)
+    checkbox_treeview.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+    item_ids = {}  # Dictionary to store item IDs corresponding to filenames
+    autochecked_files = []  # Files to be auto-checked
+    for filename, similarity in files:
+        cur_file = os.path.basename(file_path)
+        if filename != cur_file:
+            item_id = checkbox_treeview.insert_checkbox(tk.END, filename, f"{similarity:.2f}%")
+            item_ids[filename] = item_id  # Store item ID corresponding to filename
+            if autocheck and similarity == 100:
+                autochecked_files.append(filename)  # Add file to auto-checked list
+
+    label = tk.Label(root, text=f"{file_path}")
+    label.pack(pady=5)
+
+    delete_button = tk.Button(root, text="Delete Selected Files", command=delete_selected_files)
+    delete_button.pack(pady=5)
+
+    if autocheck and autochecked_files:
+        # Automatically select files with 100% similarity
+        for filename in autochecked_files:
+            item_id = item_ids.get(filename)
+            if item_id:
+                checkbox_treeview.treeview.selection_set(item_id)
+
+        # Ask for deletion confirmation
+        confirmation_message = f"The following files have 100% similarity with {os.path.basename(file_path)}. Do you want to delete them?\n\n"
+        confirmation_message += "\n".join(autochecked_files)
+        if messagebox.askyesno("Confirm Deletion", confirmation_message):
+            auto_delete_selected_files()  # Delete files if confirmed
+
+    root.mainloop()
